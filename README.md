@@ -10,8 +10,8 @@ These scripts should be put in a place visible to all cluster nodes
 The pro/epilogs should be added to GridEngine Queue definitions as:
 
 ```bash
-root@/usr/local/sge/live/default/common/sharc_gpu_prolog.sh
-root@/usr/local/sge/live/default/common/sharc_gpu_epilog.sh
+root@/usr/local/sge/live/default/common/prolog.sh
+root@/usr/local/sge/live/default/common/epilog.sh
 ```
 
 It is essential they are run as root as only root can change the device special file permissions.
@@ -76,3 +76,14 @@ In addition to this a Grid Engine complex should be created:
 
 Then each CUDA node should be configured with this complex, holding a value equal to the number of GPU cards you wish to allocate to Grid managment.
 Once this is in place the CUDA tasks should request this complex.
+
+## Testing
+
+These scripts can be (partly) unit tested using a [BATS](https://github.com/bats-core/bats-core) test suite.
+You do not need to run these tests on a Grid Engine cluster
+
+```sh
+git clone --recurse-submodules git@github.com:RSE-Sheffield/sge-gpuprolog.git
+cd sge-gpuprolog
+bash test.sh
+```

@@ -24,36 +24,16 @@ LOCKGPU=1
 MAIL=/usr/bin/mail
 ADMIN=w.furnass@sheffield.ac.uk
 VARS=''
-HOST=$(hostname -s)
-gpus_needed=0
+HOST=$(/usr/bin/hostname -s)
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source $DIR/funcs.sh
+
 if [[ "$SGE_TASK_ID" == "undefined" ]]; then
     SGE_TASK_ID=1
 fi
 
 mkdir -p ${LOCKDIR}
-
-get_n_gpus_req_per_slot() {
-    #
-    # Get the number of GPUs requested per slot for this job
-    #
-    # Arguments: none
-    # Outputs: integer to STDOUT
-    #
-    xpath_query="//detailed_job_info/djob_info/element/JB_hard_resource_list/qstat_l_requests/CE_stringval[../CE_name = 'gpu']/text()"
-    qstat -j "${JOB_ID}.${SGE_TASK_ID}" -xml | xmllint --xpath "$xpath_query" -
-}
-
-is_pe_single_node() {
-    #
-    # Is the parallel environment single-node only 
-    # i.e. does it use the pe_slots allocation rule?
-    # 
-    # Arguments: none
-    # Output: exit code
-    #
-    # shellcheck disable=SC2016
-    qconf -sp "${JOB_ID}" | grep -vE 'allocation_rule\s+\$pe_slots'
-}
 
 function mail_admin() {
     echo "$1" | "$MAIL" -s "CUDA Job prolog failure" "$ADMIN"
@@ -73,7 +53,7 @@ function number_in_list() {
 }
 
 # Query how many gpus to allocate (for serial process or per SMP or MPI slot)
-gpus_needed="$(get_n_gpus_req_per_slot)"
+declare -i gpus_needed="$(get_n_gpus_req_per_slot)"
 
 # Exit if NGPUs is null or <= 0
 if [[ -z "${gpus_needed}" ]] || [[ "${gpus_needed}" -le 0 ]]; then
@@ -83,7 +63,7 @@ fi
 # Scale GPUs with number of requested cores if using the 'smp' Grid Engine
 # Parallel Environment (as the current scheduler configuration is for the 'gpu'
 # countable complex consumable to scale with the number of requested slots)
-if [[ -n "${PE}" ]] && is_pe_single_node "${PE}" && [[ -n "${NSLOTS}" ]] && [[ "${NSLOTS}" -gt 1 ]]; then
+if is_pe_single_node "${PE}" && [[ -n "${NSLOTS}" ]] && [[ "${NSLOTS}" -gt 1 ]]; then
     gpus_needed=$(( gpus_needed * NSLOTS ))
 fi
 
