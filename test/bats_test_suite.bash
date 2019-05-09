@@ -29,3 +29,17 @@ source ../funcs.sh
     result=$(is_pe_single_node)
     assert_equal $result 1
 }
+
+@test "nvidia_chgrp argument parsing" {
+    function chmod { echo "chmod $@"; }
+    function chgrp { echo "chgrp $@"; }
+    export -f chmod chgrp
+    run ../nvidia_chgrp.sh nonexistentgroup 0
+    assert_failure
+    run ../nvidia_chgrp.sh root 99999
+    assert_failure
+    #function test { return; }
+    #export -f test
+    #run ../nvidia_chgrp.sh 20000 1
+    #assert_success
+}
