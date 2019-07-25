@@ -1,0 +1,46 @@
+#!/bin/bash
+# Set the group of a /dev/nvidia[0-9]* device to either
+#  - a valid Son of Grid Engine (SGE) job-specific group
+#    (after checking against the SGE config that the group is valid)
+#  - root
+#
+# Arguments: 
+#  - dev_grp: either the (integer) GID of a valid SoGE job-specific group or 'root'
+#  - nv_dev_idx: the integer index of a NVIDIA GPU i.e. /dev/nvidia${nv_dev_idx}
+
+set -eu
+
+function die {
+    /usr/bin/echo "$@" 1>&2
+    exit 1
+}
+
+function usage { 
+    /usr/bin/echo "Usage: $0 <dev_grp> <nv_dev_idx>"
+}
+
+declare -r DEFAULT_GROUP=root
+#declare -r DEFAULT_MODE=0660
+
+[[ $# -eq 2 ]] || die "$(usage)"
+
+declare -r dev_grp="$1"
+declare -i nv_dev_idx="$2"
+declare -r dev_node="/dev/nvidia${nv_dev_idx}"
+
+[[ -c ${dev_node} ]] || die "Error: character device node ${dev_node} does not exist"
+
+# If the group is numeric
+if [[ ${dev_grp} =~ ^[0-9]+$ ]]; then
+    gid_range=$(/usr/local/sge/live/bin/lx-amd64/qconf -sconf | /usr/bin/awk '/gid_range/ {print $2}')
+    min_gid=$(echo "${gid_range}" | cut -f1 -d-)
+    max_gid=$(echo "${gid_range}" | cut -f2 -d-)
+    if [[ ${dev_grp} -lt ${min_gid} ]] || [[ ${dev_grp} -gt ${max_gid} ]]; then
+        die "Error: SGE job group GID ${dev_grp} outside valid range (${min_gid}-${max_gid})"
+    fi
+elif [[ "${dev_grp}" != "${DEFAULT_GROUP}" ]]; then
+    die "Error: SGE job is not numeric or '${DEFAULT_GROUP}'"
+fi
+
+/usr/bin/chgrp "${dev_grp}" "${dev_node}"
+#/usr/bin/chmod "${DEFAULT_MODE}" "${dev_node}"
