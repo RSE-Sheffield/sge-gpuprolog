@@ -6,6 +6,12 @@
 # Sun Grid Engine Epilog script to free GPU lock directories for devices used by a job.
 # Based on https://github.com/kyamagu/sge-gpuprolog
 
+exec 3>&1 4>&2
+trap 'exec 2>&4 1>&3' 0 1 2 3
+exec 1>/tmp/epilog.$$.out 2>&1
+
+set -eu
+
 # Ensure SGE_GPU_LOCKS_DIR env var is set
 source /etc/profile.d/sge_gpu_locks.sh
 

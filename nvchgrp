@@ -8,6 +8,10 @@
 #  - dev_grp: either the (integer) GID of a valid SoGE job-specific group or 'root'
 #  - nv_dev_idx: the integer index of a NVIDIA GPU i.e. /dev/nvidia${nv_dev_idx}
 
+exec 3>&1 4>&2
+trap 'exec 2>&4 1>&3' 0 1 2 3
+exec 1>/tmp/nvchgrp.$$.log 2>&1
+
 set -eu
 
 function die {
