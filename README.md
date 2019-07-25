@@ -96,72 +96,78 @@ Tested with Son of Grid Engine 8.1.9 but will most likely work with other versio
 Installation
 ------------
 
-First, set up a consumable complex `gpu`:
+ 1. Ensure the three scripts in this repository, 
+    `prolog.sh` and `epilog.sh` and `nvchgrp`,
+    are accessible on all worker nodes within the SoGE system (e.g. are on a shared filesystem)
+    and are readable and executable by the `sge` user. 
 
-```
-$ qconf -mc
-```
+ 1. Ensure the permissions of all `/dev/nvidia[0-9]*` character devices are set to 0660 at boot time
+    and the owner and group are both `root` are both `root` by default.
 
-then within an editor:
+ 1. Ensure that the `nvchgrp` separate script (for changing the group of NVIDIA character devices) 
+    can be run by sge as root.
+    Create `/etc/sudoers.d/sge` containing:
 
-```
-#name               shortcut   type        relop   requestable consumable default  urgency
-#----------------------------------------------------------------------------------------------
-gpu                 gpu        INT         <=      YES         YES        0        0
-```
+    ```
+    sge ALL= (root) NOPASSWD: /path/to/nvchgrp
+    ```
 
+ 1. Ensure that the directory that will contain the lock files is present on all nodes. 
+    This needs to be readable and writable by the `sge` user. 
+    The prolog and epilog scripts learn of this path via the `SGE_GPU_LOCKS_DIR` environment variable. 
+    On the University of Sheffield's ShARC cluster this is set in `/etc/profile.d/sge_gpu_locks.sh` on all nodes.
 
-Add the `gpu` resource complex on each execution host in the cluster, 
-specifying the number of GPUs available. 
-For example:
+ 1. To ensure that locks are cleared after reboots and after a set duration 
+    (just longer than the longest possible job; 4 days at the time of writing) 
+    the `$SGE_GPU_LOCKS_DIR` is created with appropriate permissions at boot time 
+    by the [systemd-tmpfiles][systemd-tmpfiles] mechanism. 
+    This is set up on all GPU-equipped nodes by creating `/etc/tmpfiles.d/sge-gpu.conf` containing:
 
-```
-$ qconf -aattr exechost complex_values gpu=1 node001
-```
+    ```
+    D /tmp/sge-gpu 0755 sge users 5d
+    ```
 
-Set up `prolog` and `epilog` scripts for the relevant scheduler queue(s). 
-For example, for the `gpu.q` queue:
+ 1. Start configuring SoGE to use the prolog and epilog scripts: set up a SoGE consumable complex `gpu`:
 
-```
-$ qconf -mq gpu.q
-```
+    ```
+    $ qconf -mc
+    ```
 
-then within an editor ensure the `prolog` and `epilog` lines read:
+    then within an editor:
 
-```
-prolog                sge@/path/to/prolog.sh
-epilog                sge@/path/to/epilog.sh
-```
-
-The `sge@` is important: it means that the prolog and epilog scripts will be run as the `sge` user, not as the end-user, so:
-
-  * the prolog script has the permissions to append to `$SGE_JOB_SPOOL_DIR/environment` and
-  * the epilog script has the permissions to remove the lock directories created by the prolog script.
-
-Next, check the permissions on the `prolog.sh` and `epilog.sh` files: they should be readable and executable by the `sge` user.
-
-Next, ensure that a separate script for changing the group of NVIDIA character devices can be run by sge as root - 
-create `/etc/sudoers.d/sge` containing:
+    ```
+    #name               shortcut   type        relop   requestable consumable default  urgency
+    #----------------------------------------------------------------------------------------------
+    gpu                 gpu        INT         <=      YES         YES        0        0
+    ```
 
 
-```
-sge ALL= (root) NOPASSWD: /path/to/nvchgrp
-```
+ 1. Add the `gpu` resource complex on each execution host in the cluster, 
+    specifying the number of GPUs available. 
+    For example:
+    
+    ```
+    $ qconf -aattr exechost complex_values gpu=1 node001
+    ```
 
-Finally, ensure that the directory that will contain the lock files is present on all nodes. 
-This needs to be readable and writable by the `sge` user. 
-The prolog and epilog scripts learn of this path via the `SGE_GPU_LOCKS_DIR` environment variable. 
-On the University of Sheffield's ShARC cluster this is set in `/etc/profile.d/sge_gpu_locks.sh` on all nodes.
+ 1. Set up `prolog` and `epilog` scripts for the relevant scheduler queue(s). 
+    For example, for the `gpu.q` queue:
+    
+    ```
+    $ qconf -mq gpu.q
+    ```
 
-To ensure that locks are cleared after reboots and after a set duration 
-(just longer than the longest possible job; 4 days at the time of writing) 
-the `$SGE_GPU_LOCKS_DIR` is created with appropriate permissions at boot time 
-by the [systemd-tmpfiles][systemd-tmpfiles] mechanism. 
-This is set up on all GPU-equipped nodes by creating `/etc/tmpfiles.d/sge-gpu.conf` containing:
+    then within an editor ensure the `prolog` and `epilog` lines read:
 
-```
-D /tmp/sge-gpu 0755 sge users 5d
-```
+    ```
+    prolog                sge@/path/to/prolog.sh
+    epilog                sge@/path/to/epilog.sh
+    ```
+
+    The `sge@` is important: it means that the prolog and epilog scripts will be run as the `sge` user, not as the end-user, so:
+
+      * the prolog script has the permissions to append to `$SGE_JOB_SPOOL_DIR/environment` and
+      * the epilog script has the permissions to remove the lock directories created by the prolog script.
 
 Usage
 -----
@@ -185,6 +191,8 @@ or `cudaSetDevice(1)` to use the second (original index of 7).
 
 CUDA will then use to identify the subset of devices to be used.
 
+TODO: update this section.
+
 
 [MPI]: https://en.wikipedia.org/wiki/Message_Passing_Interface
 [RSMAP]: http://gridengine.eu/grid-engine-internals/102-univa-grid-engine-810-features-part-2-better-resource-management-with-the-rsmap-complex-2012-05-25
@@ -193,5 +201,3 @@ CUDA will then use to identify the subset of devices to be used.
 [sge_conf-man]: http://gridscheduler.sourceforge.net/htmlman/htmlman5/sge_conf.html
 [systemd-tmpfiles]: https://www.freedesktop.org/software/systemd/man/systemd-tmpfiles.html
 [tmpfs]: https://en.wikipedia.org/wiki/Tmpfs
-
-sge ALL= (root) NOPASSWD: /usr/local/scripts/gpu-locking/test/nvchgrp
